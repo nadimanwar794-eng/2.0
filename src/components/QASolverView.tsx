@@ -179,57 +179,8 @@ export const QASolverView: React.FC<QASolverViewProps> = ({
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-4 pb-12">
-      {/* 1. TOP HEADER WITH DIMENSION TOGGLE */}
-      <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xl backdrop-blur-md">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold">
-                <Calculator className="w-4 h-4" />
-              </div>
-              <h2 className="text-base sm:text-lg font-extrabold text-white">
-                {language === 'hi'
-                  ? 'स्टेप-बाय-स्टेप संख्यात्मक सॉल्वर'
-                  : 'Step-by-Step Numerical Math Solver'}
-              </h2>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {language === 'hi'
-                ? 'कोई भी मान भरें और सूत्र, गणना व चरणबद्ध उत्तर तुरंत प्राप्त करें'
-                : 'Enter known values to generate complete formulas, steps & solutions'}
-            </p>
-          </div>
-
-          {/* Q&A Dimension Switcher (3D vs 2D) */}
-          <div className="flex items-center p-1 rounded-xl bg-slate-950 border border-slate-800 self-stretch sm:self-auto justify-center">
-            <button
-              onClick={() => setQaDimension('3d')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                qaDimension === '3d'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/40 ring-1 ring-indigo-400'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Box className="w-3.5 h-3.5" />
-              <span>3D {language === 'hi' ? 'ठोस व रीज़निंग' : '3D Geometry'}</span>
-            </button>
-            <button
-              onClick={() => setQaDimension('2d')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                qaDimension === '2d'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/40 ring-1 ring-emerald-400'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5" />
-              <span>2D {language === 'hi' ? 'समतल व क्षेत्रमिति' : '2D Geometry'}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. SHAPE SELECTION CHIPS */}
-      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar">
+      {/* 1. SHAPE SELECTION CHIPS */}
+      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar pt-1">
         {filteredModules.map((mod) => {
           const isSelected = mod.id === selectedModuleId;
           return (
