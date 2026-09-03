@@ -39,6 +39,7 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const isDraggingRef = useRef(false);
   const previousMousePositionRef = useRef({ x: 0, y: 0 });
   const cameraSphericalRef = useRef({ radius: 11.5, theta: Math.PI / 4, phi: Math.PI / 3 });
+  const cameraTargetRef = useRef(new THREE.Vector3(0, 0, 0));
 
   // Initialize Scene, Camera, Renderer
   useEffect(() => {
@@ -95,40 +96,20 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     // Update Camera position based on spherical coords
     const updateCameraPos = () => {
       const { radius, theta, phi } = cameraSphericalRef.current;
-      camera.position.x = radius * Math.sin(phi) * Math.sin(theta);
-      camera.position.y = radius * Math.cos(phi);
-      camera.position.z = radius * Math.sin(phi) * Math.cos(theta);
-      camera.lookAt(0, 0, 0);
+      camera.position.x = cameraTargetRef.current.x + radius * Math.sin(phi) * Math.sin(theta);
+      camera.position.y = cameraTargetRef.current.y + radius * Math.cos(phi);
+      camera.position.z = cameraTargetRef.current.z + radius * Math.sin(phi) * Math.cos(theta);
+      camera.lookAt(cameraTargetRef.current);
     };
     updateCameraPos();
 
-    // Mouse / Touch Handlers for 3D Orbit & Zoom
+    // Pointer controls work for mouse, pen, and touch. One finger orbits;
+    // two fingers pinch to zoom and move together to pan the scene.
     const dom = renderer.domElement;
-
-    const onMouseDown = (e: MouseEvent) => {
-      isDraggingRef.current = true;
-      previousMousePositionRef.current = { x: e.clientX, y: e.clientY };
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (isDraggingRef.current) {
-        const deltaX = e.clientX - previousMousePositionRef.current.x;
-        const deltaY = e.clientY - previousMousePositionRef.current.y;
-
-        cameraSphericalRef.current.theta -= deltaX * 0.008;
-        cameraSphericalRef.current.phi = Math.max(
-          0.05,
-          Math.min(Math.PI - 0.05, cameraSphericalRef.current.phi - deltaY * 0.008)
-        );
-
-        updateCameraPos();
-        previousMousePositionRef.current = { x: e.clientX, y: e.clientY };
-      }
-    };
-
-    const onMouseUp = () => {
-      isDraggingRef.current = false;
-    };
+    dom.style.touchAction = 'none';
+    const pointers = new Map<number, { x: number; y: number }>();
+    let previousPinchDistance = 0;
+    let previousPinchCenter = { x: 0, y: 0 };
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -139,55 +120,89 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       updateCameraPos();
     };
 
-    // Touch Support
-    let touchStartDist = 0;
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 1) {
-        isDraggingRef.current = true;
-        previousMousePositionRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      } else if (e.touches.length === 2) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        touchStartDist = Math.sqrt(dx * dx + dy * dy);
+    const getPinchState = () => {
+      const points = Array.from(pointers.values());
+      const [first, second] = points;
+      const dx = first.x - second.x;
+      const dy = first.y - second.y;
+      return {
+        distance: Math.sqrt(dx * dx + dy * dy),
+        center: { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 },
+      };
+    };
+
+    const panCamera = (deltaX: number, deltaY: number) => {
+      const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+      const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+      const panScale = cameraSphericalRef.current.radius * 0.0018;
+      cameraTargetRef.current.addScaledVector(right, -deltaX * panScale);
+      cameraTargetRef.current.addScaledVector(up, deltaY * panScale);
+      updateCameraPos();
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      dom.setPointerCapture?.(e.pointerId);
+      isDraggingRef.current = true;
+
+      if (pointers.size === 1) {
+        previousMousePositionRef.current = { x: e.clientX, y: e.clientY };
+      } else if (pointers.size === 2) {
+        const pinch = getPinchState();
+        previousPinchDistance = pinch.distance;
+        previousPinchCenter = pinch.center;
       }
     };
 
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 1 && isDraggingRef.current) {
-        const deltaX = e.touches[0].clientX - previousMousePositionRef.current.x;
-        const deltaY = e.touches[0].clientY - previousMousePositionRef.current.y;
+    const onPointerMove = (e: PointerEvent) => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-        cameraSphericalRef.current.theta -= deltaX * 0.01;
+      if (pointers.size === 1 && isDraggingRef.current) {
+        const deltaX = e.clientX - previousMousePositionRef.current.x;
+        const deltaY = e.clientY - previousMousePositionRef.current.y;
+        cameraSphericalRef.current.theta -= deltaX * 0.008;
         cameraSphericalRef.current.phi = Math.max(
           0.05,
-          Math.min(Math.PI - 0.05, cameraSphericalRef.current.phi - deltaY * 0.01)
+          Math.min(Math.PI - 0.05, cameraSphericalRef.current.phi - deltaY * 0.008)
         );
-
         updateCameraPos();
-        previousMousePositionRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      } else if (e.touches.length === 2 && touchStartDist > 0) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const factor = (touchStartDist - dist) * 0.05;
-        cameraSphericalRef.current.radius = Math.max(4, Math.min(35, cameraSphericalRef.current.radius + factor));
-        updateCameraPos();
-        touchStartDist = dist;
+        previousMousePositionRef.current = { x: e.clientX, y: e.clientY };
+      } else if (pointers.size >= 2) {
+        e.preventDefault();
+        const pinch = getPinchState();
+        const zoomDelta = (previousPinchDistance - pinch.distance) * 0.025;
+        cameraSphericalRef.current.radius = Math.max(
+          4,
+          Math.min(35, cameraSphericalRef.current.radius + zoomDelta)
+        );
+        panCamera(
+          pinch.center.x - previousPinchCenter.x,
+          pinch.center.y - previousPinchCenter.y
+        );
+        previousPinchDistance = pinch.distance;
+        previousPinchCenter = pinch.center;
       }
     };
 
-    const onTouchEnd = () => {
-      isDraggingRef.current = false;
-      touchStartDist = 0;
+    const onPointerUp = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      dom.releasePointerCapture?.(e.pointerId);
+      if (pointers.size === 0) {
+        isDraggingRef.current = false;
+        previousPinchDistance = 0;
+      } else if (pointers.size === 1) {
+        const remaining = Array.from(pointers.values())[0];
+        previousMousePositionRef.current = remaining;
+        previousPinchDistance = 0;
+      }
     };
 
-    dom.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
     dom.addEventListener('wheel', onWheel, { passive: false });
-    dom.addEventListener('touchstart', onTouchStart);
-    dom.addEventListener('touchmove', onTouchMove);
-    dom.addEventListener('touchend', onTouchEnd);
+    dom.addEventListener('pointerdown', onPointerDown);
+    dom.addEventListener('pointermove', onPointerMove, { passive: false });
+    dom.addEventListener('pointerup', onPointerUp);
+    dom.addEventListener('pointercancel', onPointerUp);
 
     // Raycasting for mini-cube click
     const raycaster = new THREE.Raycaster();
@@ -242,13 +257,11 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
-      dom.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
       dom.removeEventListener('wheel', onWheel);
-      dom.removeEventListener('touchstart', onTouchStart);
-      dom.removeEventListener('touchmove', onTouchMove);
-      dom.removeEventListener('touchend', onTouchEnd);
+      dom.removeEventListener('pointerdown', onPointerDown);
+      dom.removeEventListener('pointermove', onPointerMove);
+      dom.removeEventListener('pointerup', onPointerUp);
+      dom.removeEventListener('pointercancel', onPointerUp);
       dom.removeEventListener('click', onClick);
       renderer.dispose();
     };
@@ -279,7 +292,11 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   return (
     <div className="relative w-full h-full min-h-[380px] sm:min-h-[460px] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl flex flex-col">
       {/* 3D WebGL Canvas Container */}
-      <div ref={mountRef} className="w-full h-full flex-1 cursor-grab active:cursor-grabbing" />
+      <div
+        ref={mountRef}
+        className="w-full h-full flex-1 cursor-grab active:cursor-grabbing touch-none select-none"
+        aria-label={language === 'hi' ? '3D मॉडल: स्पर्श करके घुमाएं और ज़ूम करें' : '3D model: drag to rotate and pinch to zoom'}
+      />
 
       {/* Floating Control Overlay */}
       <div className="absolute top-3 left-3 sm:top-4 sm:left-4 flex flex-wrap items-center gap-1.5 sm:gap-2 pointer-events-auto z-30">
@@ -303,11 +320,12 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
               onClick={() => {
                 if (cameraRef.current) {
                   cameraSphericalRef.current = { radius: 11.5, theta: Math.PI / 4, phi: Math.PI / 3 };
+                  cameraTargetRef.current.set(0, 0, 0);
                   const { radius, theta, phi } = cameraSphericalRef.current;
                   cameraRef.current.position.x = radius * Math.sin(phi) * Math.sin(theta);
                   cameraRef.current.position.y = radius * Math.cos(phi);
                   cameraRef.current.position.z = radius * Math.sin(phi) * Math.cos(theta);
-                  cameraRef.current.lookAt(0, 0, 0);
+                  cameraRef.current.lookAt(cameraTargetRef.current);
                   if (mainGroupRef.current) {
                     mainGroupRef.current.rotation.set(0, 0, 0);
                   }
@@ -382,7 +400,11 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       {/* Interactive Helper Legend & Tips */}
       <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none text-[11px] text-slate-400 bg-slate-900/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800/80">
         <span className="flex items-center gap-1.5">
-          <span className="text-indigo-400 font-semibold">🖱️ Drag:</span> {language === 'hi' ? 'घुमाएं (Rotate)' : 'Rotate'} | <span className="text-indigo-400 font-semibold">Scroll:</span> {language === 'hi' ? 'ज़ूम (Zoom)' : 'Zoom'}
+          <span className="text-indigo-400 font-semibold">☝️ {language === 'hi' ? 'स्पर्श/Drag:' : 'Touch/Drag:'}</span>
+          {language === 'hi' ? 'घुमाएं' : 'Rotate'} ·
+          <span className="text-indigo-400 font-semibold">{language === 'hi' ? 'दो उंगली:' : '2 fingers:'}</span>
+          {language === 'hi' ? 'ज़ूम + पैन' : 'Zoom + Pan'} ·
+          <span className="text-indigo-400 font-semibold">Scroll:</span> {language === 'hi' ? 'ज़ूम' : 'Zoom'}
         </span>
         {mode === 'cube_cutting' && (
           <span className="text-amber-400 font-medium hidden sm:inline">
