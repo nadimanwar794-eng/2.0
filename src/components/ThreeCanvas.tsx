@@ -32,6 +32,7 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
   const [isRotating, setIsRotating] = useState(false);
   const [showToolbar, setShowToolbar] = useState(true);
+  const [webglError, setWebglError] = useState(false);
   const isRotatingRef = useRef(false);
   isRotatingRef.current = isRotating;
 
@@ -55,7 +56,18 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
     cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance',
+      });
+    } catch (error) {
+      console.warn('3D preview is unavailable in this browser:', error);
+      setWebglError(true);
+      return;
+    }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -132,6 +144,7 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     };
 
     const panCamera = (deltaX: number, deltaY: number) => {
+      camera.updateMatrixWorld();
       const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
       const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
       const panScale = cameraSphericalRef.current.radius * 0.0018;
@@ -288,6 +301,30 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       renderDiceScene(mainGroup, diceParams);
     }
   }, [mode, shapeParams, cubeCutParams, diceParams, selectedCube]);
+
+  if (webglError) {
+    return (
+      <div className="relative w-full h-full min-h-[380px] sm:min-h-[460px] rounded-2xl overflow-hidden border border-indigo-500/30 bg-[radial-gradient(circle_at_50%_35%,#172554_0%,#0f172a_42%,#030712_100%)] shadow-2xl flex items-center justify-center p-6">
+        <div className="max-w-sm text-center">
+          <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-indigo-500/15 border border-indigo-400/30 flex items-center justify-center text-3xl">
+            ◈
+          </div>
+          <h3 className="text-base font-bold text-white">
+            {language === 'hi' ? '3D मोड तैयार है' : '3D mode is ready'}
+          </h3>
+          <p className="mt-2 text-xs leading-5 text-slate-300">
+            {language === 'hi'
+              ? 'इस preview browser में WebGL उपलब्ध नहीं है। किसी WebGL-enabled device/browser पर मॉडल को स्पर्श करके घुमाएं, दो उंगलियों से ज़ूम और पैन करें।'
+              : 'WebGL is unavailable in this preview browser. On a WebGL-enabled device/browser, drag to rotate and use two fingers to zoom and pan.'}
+          </p>
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-[11px] text-indigo-200">
+            <span className="h-2 w-2 rounded-full bg-amber-400" />
+            {language === 'hi' ? 'WebGL सक्षम करें' : 'Enable WebGL'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full min-h-[380px] sm:min-h-[460px] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl flex flex-col">

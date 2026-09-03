@@ -70,7 +70,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-white">
-                {language === 'hi' ? 'गणित 3D व 2D स्टूडियो' : 'Math 3D & 2D Studio'}
+                {language === 'hi' ? 'गणित 3D विज़ुअल स्टूडियो' : 'Math 3D Visual Studio'}
               </h1>
               <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                 100% Offline

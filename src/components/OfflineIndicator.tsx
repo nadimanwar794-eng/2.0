@@ -20,7 +20,7 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ language }) 
       <WifiOff className="w-4 h-4 text-amber-400 shrink-0" />
       <span>
         {language === 'hi'
-          ? '100% ऑफ़लाइन मोड — सभी 3D टूल्स व सॉल्वर बिना इंटरनेट के काम कर रहे हैं'
+          ? '100% ऑफ़लाइन मोड — सभी 3D विज़ुअल टूल्स बिना इंटरनेट के काम कर रहे हैं'
           : '100% Offline Mode — All 3D tools & solver working offline'}
       </span>
     </div>
